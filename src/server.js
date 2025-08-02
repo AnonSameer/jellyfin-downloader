@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const config = require('../config/config');
 const DownloadService = require('./services/downloadService');
+const JellyfinService = require('./services/jellyfinService');  
 const createDownloadRoutes = require('./routes/downloadRoutes');
 const FileUtils = require('./utils/fileUtils');
 
@@ -12,6 +13,7 @@ class JellyfinDownloaderServer {
       config.downloadFolder, 
       config.maxConcurrentDownloads
     );
+    this.jellyfinService = new JellyfinService(config);  
     
     this.setupMiddleware();
     this.setupRoutes();
@@ -39,12 +41,10 @@ class JellyfinDownloaderServer {
     });
     
     // API routes
-    this.app.use('/api', createDownloadRoutes(this.downloadService));
-    
-    // Legacy routes (for backward compatibility)
-    this.app.use('/', createDownloadRoutes(this.downloadService));
+    this.app.use('/api', createDownloadRoutes(this.downloadService, this.jellyfinService));
+    this.app.use('/', createDownloadRoutes(this.downloadService, this.jellyfinService));
   }
-  
+   
   setupErrorHandling() {
     // 404 handler
     this.app.use((req, res) => {
@@ -58,11 +58,11 @@ class JellyfinDownloaderServer {
       res.status(500).json({ error: 'Internal server error' });
     });
   }
-  
+
   start() {
     this.server = this.app.listen(config.port, config.host, () => {
       const localIP = config.getLocalIP();
-      
+
       console.log('🚀 Jellyfin Downloader Server Started!');
       console.log('=' .repeat(60));
       console.log(`📱 Phone Access: http://${localIP}:${config.port}`);

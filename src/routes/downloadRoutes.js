@@ -2,7 +2,7 @@ const express = require('express');
 const FileUtils = require('../utils/fileUtils');
 const router = express.Router();
 
-function createDownloadRoutes(downloadService) {
+function createDownloadRoutes(downloadService, jellyfinService) {
   // Start download
   router.post('/download', async (req, res) => {
     const { url, filename } = req.body;
@@ -39,6 +39,32 @@ function createDownloadRoutes(downloadService) {
   router.get('/downloads', (req, res) => {
     const downloads = downloadService.getActiveDownloads();
     res.json(downloads);
+  });
+  
+  // Refresh Jellyfin library
+  router.post('/jellyfin/refresh', async (req, res) => {
+    try {
+      if (!jellyfinService.isEnabled()) {
+        return res.status(503).json({ 
+          error: 'Jellyfin integration is not configured. Check your secrets.json file.' 
+        });
+      }
+      
+      const result = await jellyfinService.refreshLibrary();
+      res.json(result);
+      
+    } catch (error) {
+      console.error(`❌ [${FileUtils.getCurrentTimestamp()}] Jellyfin refresh request failed: ${error.message}`);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Get Jellyfin status
+  router.get('/jellyfin/status', (req, res) => {
+    res.json({
+      enabled: jellyfinService.isEnabled(),
+      serverUrl: jellyfinService.isEnabled() ? jellyfinService.serverUrl : null
+    });
   });
   
   return router;

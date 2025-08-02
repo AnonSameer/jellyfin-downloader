@@ -5,6 +5,8 @@ class JellyfinDownloaderApp {
         this.downloadsDiv = document.getElementById('downloads');
         this.downloadsList = document.getElementById('downloadsList');
         this.downloadBtn = document.getElementById('downloadBtn');
+        this.refreshBtn = document.getElementById('refreshBtn');
+        this.jellyfinSection = document.getElementById('jellyfinSection');
         this.urlInput = document.getElementById('url');
         this.filenameInput = document.getElementById('filename');
         
@@ -15,6 +17,7 @@ class JellyfinDownloaderApp {
         this.setupEventListeners();
         this.startPeriodicUpdates();
         this.updateDownloads();
+        this.checkJellyfinStatus();
         
         // Auto-focus URL input on desktop
         if (window.innerWidth > 768) {
@@ -24,6 +27,7 @@ class JellyfinDownloaderApp {
     
     setupEventListeners() {
         this.form.addEventListener('submit', (e) => this.handleSubmit(e));
+        this.refreshBtn.addEventListener('click', () => this.handleJellyfinRefresh());
         
         // Clear status on input
         this.urlInput.addEventListener('input', () => this.clearStatus());
@@ -44,7 +48,7 @@ class JellyfinDownloaderApp {
             }
         });
     }
-    
+
     async handleSubmit(e) {
         e.preventDefault();
         
@@ -88,6 +92,50 @@ class JellyfinDownloaderApp {
             this.setLoading(false);
         }
     }
+
+    async checkJellyfinStatus() {
+        try {
+            const response = await fetch('/jellyfin/status');
+            const status = await response.json();
+            
+            if (status.enabled) {
+                this.jellyfinSection.style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Failed to check Jellyfin status:', error);
+        }
+    }
+    
+    async handleJellyfinRefresh() {
+        this.setRefreshLoading(true);
+        
+        try {
+            const response = await fetch('/jellyfin/refresh', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                this.showStatus('✅ Jellyfin library refresh started!', 'success');
+                
+                // Haptic feedback on mobile
+                if (navigator.vibrate) {
+                    navigator.vibrate(50);
+                }
+            } else {
+                this.showStatus('❌ ' + result.error, 'error');
+            }
+        } catch (error) {
+            console.error('Jellyfin refresh error:', error);
+            this.showStatus('❌ Failed to refresh Jellyfin library', 'error');
+        } finally {
+            this.setRefreshLoading(false);
+        }
+    }
     
     validateUrl(url = null) {
         const urlToCheck = url || this.urlInput.value.trim();
@@ -114,6 +162,22 @@ class JellyfinDownloaderApp {
             this.downloadBtn.innerHTML = `
                 <span class="btn-icon">⬇️</span>
                 <span class="btn-text">Start Download</span>
+            `;
+        }
+    }
+
+    setRefreshLoading(isLoading) {
+        this.refreshBtn.disabled = isLoading;
+        
+        if (isLoading) {
+            this.refreshBtn.innerHTML = `
+                <div class="progress-spinner"></div>
+                <span class="btn-text">Refreshing...</span>
+            `;
+        } else {
+            this.refreshBtn.innerHTML = `
+                <span class="btn-icon">🔄</span>
+                <span class="btn-text">Refresh Jellyfin Library</span>
             `;
         }
     }

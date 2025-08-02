@@ -74,7 +74,7 @@ input[type="text"]:focus {
 }
 
 /* Button styles */
-button {
+button, .jellyfin-btn {
     width: 100%;
     padding: 15px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -91,16 +91,25 @@ button {
     gap: 8px;
 }
 
-button:hover:not(:disabled) {
+.jellyfin-btn {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    margin-top: 10px;
+}
+
+button:hover:not(:disabled), .jellyfin-btn:hover:not(:disabled) {
     transform: translateY(-2px);
     box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
 }
 
-button:active:not(:disabled) {
+.jellyfin-btn:hover:not(:disabled) {
+    box-shadow: 0 8px 25px rgba(40, 167, 69, 0.3);
+}
+
+button:active:not(:disabled), .jellyfin-btn:active:not(:disabled) {
     transform: translateY(0);
 }
 
-button:disabled {
+button:disabled, .jellyfin-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
     transform: none;
