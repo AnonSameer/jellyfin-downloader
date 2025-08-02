@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jellyfin Downloader</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>📺 Jellyfin Downloader</h1>
+        <p class="subtitle">Send download links to your PC</p>
+        
+        <form id="downloadForm">
+            <div class="form-group">
+                <label for="url">Download URL:</label>
+                <input type="url" id="url" name="url" required placeholder="https://example.com/file.mp4">
+            </div>
+            
+            <div class="form-group">
+                <label for="filename">Custom Filename (optional):</label>
+                <input type="text" id="filename" name="filename" placeholder="Leave empty to use original filename">
+            </div>
+            
+            <button type="submit" id="downloadBtn">
+                <span class="btn-icon">⬇️</span>
+                <span class="btn-text">Start Download</span>
+            </button>
+        </form>
+        
+        <div id="status"></div>
+        
+        <div class="downloads" id="downloads" style="display: none;">
+            <h3>Active Downloads:</h3>
+            <div id="downloadsList"></div>
+        </div>
+        
+        <div class="info-section">
+            <h4>ℹ️ How it works:</h4>
+            <ul>
+                <li>Paste a direct download link</li>
+                <li>Files download directly to your PC</li>
+                <li>Saved to your Jellyfin media folder</li>
+                <li>Available immediately in Jellyfin</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
