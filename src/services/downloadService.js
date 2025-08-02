@@ -12,6 +12,10 @@ class DownloadService {
     
     // Ensure download folder exists
     FileUtils.ensureDirectoryExists(this.downloadFolder);
+    
+    console.log(`📁 Download service initialized`);
+    console.log(`   Folder: ${this.downloadFolder}`);
+    console.log(`   Max concurrent: ${this.maxConcurrentDownloads}`);
   }
   
   canStartNewDownload() {
@@ -31,29 +35,51 @@ class DownloadService {
     }
     
     const parsedUrl = new URL(url);
-    let filename = customFilename || FileUtils.getFilenameFromUrl(url);
-    filename = FileUtils.sanitizeFilename(filename);
+    const originalFilename = FileUtils.getFilenameFromUrl(url);
+    
+    // Preserve file extension when using custom filename
+    let finalFilename = FileUtils.preserveFileExtension(customFilename, originalFilename);
+    finalFilename = FileUtils.sanitizeFilename(finalFilename);
     
     const downloadId = Date.now().toString();
-    const filePath = path.join(this.downloadFolder, filename);
+    const filePath = path.join(this.downloadFolder, finalFilename);
+    
+    // Check if file already exists
+    if (fs.existsSync(filePath)) {
+      const timestamp = Date.now();
+      const ext = path.extname(finalFilename);
+      const nameWithoutExt = path.basename(finalFilename, ext);
+      finalFilename = `${nameWithoutExt}_${timestamp}${ext}`;
+    }
+    
+    // Server-side logging
+    console.log(`\n🔄 [${FileUtils.getCurrentTimestamp()}] Download started`);
+    console.log(`   URL: ${url}`);
+    console.log(`   File: ${finalFilename}`);
+    if (customFilename) {
+      console.log(`   Custom name: ${customFilename} → ${finalFilename}`);
+    }
     
     // Add to active downloads
     this.activeDownloads.set(downloadId, {
-      filename,
+      filename: finalFilename,
       status: 'Starting...',
       progress: 0,
       url: url
     });
     
     // Start download asynchronously
-    this._downloadFile(url, filePath, downloadId)
+    this._downloadFile(url, path.join(this.downloadFolder, finalFilename), downloadId)
       .then(() => {
+        console.log(`✅ [${FileUtils.getCurrentTimestamp()}] Download completed: ${finalFilename}`);
         this.activeDownloads.delete(downloadId);
       })
       .catch((error) => {
-        console.error(`Download failed for ${filename}:`, error.message);
+        console.error(`❌ [${FileUtils.getCurrentTimestamp()}] Download failed: ${finalFilename}`);
+        console.error(`   Error: ${error.message}`);
+        
         this.activeDownloads.set(downloadId, {
-          filename,
+          filename: finalFilename,
           status: 'Failed: ' + error.message,
           progress: 0,
           url: url
@@ -67,8 +93,8 @@ class DownloadService {
     
     return {
       downloadId,
-      filename,
-      message: `Download started: ${filename}`
+      filename: finalFilename,
+      message: `Download started: ${finalFilename}`
     };
   }
   
@@ -78,12 +104,14 @@ class DownloadService {
       const file = fs.createWriteStream(filePath);
       let downloadedBytes = 0;
       let totalBytes = 0;
+      let lastLogTime = 0;
       
       const request = client.get(url, (response) => {
         // Handle redirects
         if (response.statusCode === 302 || response.statusCode === 301) {
           file.close();
           fs.unlinkSync(filePath);
+          console.log(`🔄 Following redirect for: ${path.basename(filePath)}`);
           return this._downloadFile(response.headers.location, filePath, downloadId)
             .then(resolve)
             .catch(reject);
@@ -108,7 +136,8 @@ class DownloadService {
         
         file.on('finish', () => {
           file.close();
-          console.log(`✅ Download completed: ${path.basename(filePath)}`);
+          const finalSize = fs.statSync(filePath).size;
+          console.log(`💾 Saved: ${FileUtils.formatBytes(finalSize)} - ${filePath}`);
           resolve();
         });
       });

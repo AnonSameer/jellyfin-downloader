@@ -29,6 +29,30 @@ class FileUtils {
     // Remove or replace invalid characters for cross-platform compatibility
     return filename.replace(/[<>:"/\\|?*]/g, '_').replace(/\s+/g, ' ').trim();
   }
+  
+  static preserveFileExtension(customFilename, originalFilename) {
+    if (!customFilename) return originalFilename;
+    
+    const originalExt = path.extname(originalFilename);
+    const customExt = path.extname(customFilename);
+    
+    // If custom filename already has an extension, use it as-is
+    if (customExt) {
+      return customFilename;
+    }
+    
+    // If no extension in custom name, append the original extension
+    if (originalExt) {
+      return customFilename + originalExt;
+    }
+    
+    return customFilename;
+  }
+  
+  static getCurrentTimestamp() {
+    const now = new Date();
+    return now.toISOString().replace('T', ' ').substring(0, 19);
+  }
 }
 
 module.exports = FileUtils;
