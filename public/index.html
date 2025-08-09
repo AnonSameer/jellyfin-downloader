@@ -11,22 +11,64 @@
         <h1>📺 Jellyfin Downloader</h1>
         <p class="subtitle">Send download links to your PC</p>
         
-        <form id="downloadForm">
-            <div class="form-group">
-                <label for="url">Download URL:</label>
-                <input type="url" id="url" name="url" required placeholder="https://example.com/file.mp4">
+        <div class="tab-container">
+            <div class="tab-buttons">
+                <button type="button" class="tab-btn active" data-tab="downloader">
+                    <span class="btn-icon">⬇️</span>
+                    <span class="btn-text">Direct Download</span>
+                </button>
+                <button type="button" class="tab-btn" data-tab="search">
+                    <span class="btn-icon">🔍</span>
+                    <span class="btn-text">Search Movies/TV</span>
+                </button>
             </div>
+        </div>
+
+        <!-- Direct Download Tab -->
+        <div class="tab-content active" id="downloader-tab">
+            <form id="downloadForm">
+                <div class="form-group">
+                    <label for="url">Download URL:</label>
+                    <input type="url" id="url" name="url" required placeholder="https://example.com/file.mp4">
+                </div>
+                
+                <div class="form-group">
+                    <label for="filename">Custom Filename (optional):</label>
+                    <input type="text" id="filename" name="filename" placeholder="Leave empty to use original filename">
+                </div>
+                
+                <button type="submit" id="downloadBtn">
+                    <span class="btn-icon">⬇️</span>
+                    <span class="btn-text">Start Download</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Search Movies/TV Tab -->
+        <div class="tab-content" id="search-tab">
+            <form id="searchForm">
+                <div class="form-group">
+                    <label for="searchQuery">Movie or TV Show:</label>
+                    <input type="text" id="searchQuery" name="searchQuery" required placeholder="The Dark Knight, Breaking Bad, etc.">
+                </div>
+                
+                <div class="form-group">
+                    <label for="contentType">Content Type:</label>
+                    <select id="contentType" name="contentType">
+                        <option value="all">Movies & TV Shows</option>
+                        <option value="movies">Movies Only</option>
+                        <option value="tv">TV Shows Only</option>
+                    </select>
+                </div>
+                
+                <button type="submit" id="searchBtn">
+                    <span class="btn-icon">🔍</span>
+                    <span class="btn-text">Search</span>
+                </button>
+            </form>
             
-            <div class="form-group">
-                <label for="filename">Custom Filename (optional):</label>
-                <input type="text" id="filename" name="filename" placeholder="Leave empty to use original filename">
-            </div>
-            
-            <button type="submit" id="downloadBtn">
-                <span class="btn-icon">⬇️</span>
-                <span class="btn-text">Start Download</span>
-            </button>
-        </form>
+            <div id="searchResults" class="search-results"></div>
+        </div>
         
         <div class="jellyfin-section" id="jellyfinSection" style="display: none;">
             <button type="button" id="refreshBtn" class="jellyfin-btn">

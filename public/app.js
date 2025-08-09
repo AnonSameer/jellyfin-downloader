@@ -1,20 +1,26 @@
 class JellyfinDownloaderApp {
     constructor() {
         this.form = document.getElementById('downloadForm');
+        this.searchForm = document.getElementById('searchForm');
         this.statusDiv = document.getElementById('status');
         this.downloadsDiv = document.getElementById('downloads');
         this.downloadsList = document.getElementById('downloadsList');
         this.downloadBtn = document.getElementById('downloadBtn');
+        this.searchBtn = document.getElementById('searchBtn');
         this.refreshBtn = document.getElementById('refreshBtn');
         this.jellyfinSection = document.getElementById('jellyfinSection');
         this.urlInput = document.getElementById('url');
         this.filenameInput = document.getElementById('filename');
+        this.searchQueryInput = document.getElementById('searchQuery');
+        this.contentTypeSelect = document.getElementById('contentType');
+        this.searchResults = document.getElementById('searchResults');
         
         this.init();
     }
     
     init() {
         this.setupEventListeners();
+        this.setupTabs();
         this.startPeriodicUpdates();
         this.updateDownloads();
         this.checkJellyfinStatus();
@@ -27,11 +33,13 @@ class JellyfinDownloaderApp {
     
     setupEventListeners() {
         this.form.addEventListener('submit', (e) => this.handleSubmit(e));
+        this.searchForm.addEventListener('submit', (e) => this.handleSearch(e));
         this.refreshBtn.addEventListener('click', () => this.handleJellyfinRefresh());
         
         // Clear status on input
         this.urlInput.addEventListener('input', () => this.clearStatus());
         this.filenameInput.addEventListener('input', () => this.clearStatus());
+        this.searchQueryInput.addEventListener('input', () => this.clearStatus());
         
         // Handle paste event
         this.urlInput.addEventListener('paste', () => {
@@ -46,6 +54,33 @@ class JellyfinDownloaderApp {
             } else {
                 this.resumeUpdates();
             }
+        });
+    }
+    
+    setupTabs() {
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const targetTab = button.dataset.tab;
+                
+                // Update button states
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                
+                // Update content visibility
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                    if (content.id === `${targetTab}-tab`) {
+                        content.classList.add('active');
+                    }
+                });
+                
+                // Clear status when switching tabs
+                this.clearStatus();
+                this.clearSearchResults();
+            });
         });
     }
 
@@ -90,6 +125,150 @@ class JellyfinDownloaderApp {
             this.showStatus('Network error: Unable to connect to server', 'error');
         } finally {
             this.setLoading(false);
+        }
+    }
+
+    async handleSearch(e) {
+        e.preventDefault();
+        
+        const query = this.searchQueryInput.value.trim();
+        const contentType = this.contentTypeSelect.value;
+        
+        if (!query) {
+            this.showStatus('Please enter a movie or TV show name', 'error');
+            return;
+        }
+        
+        this.setSearchLoading(true);
+        this.clearSearchResults();
+        
+        try {
+            const response = await fetch('/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ query, contentType })
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                this.displaySearchResults(result.results);
+                if (result.results.length === 0) {
+                    this.showNoResults();
+                }
+            } else {
+                this.showStatus('Search failed: ' + result.error, 'error');
+            }
+        } catch (error) {
+            console.error('Search error:', error);
+            this.showStatus('Search failed: Unable to connect to server', 'error');
+        } finally {
+            this.setSearchLoading(false);
+        }
+    }
+    
+    setSearchLoading(isLoading) {
+        this.searchBtn.disabled = isLoading;
+        
+        if (isLoading) {
+            this.searchBtn.innerHTML = `
+                <div class="progress-spinner"></div>
+                <span class="btn-text">Searching...</span>
+            `;
+            this.searchResults.innerHTML = '<div class="search-loading">Searching for content...</div>';
+        } else {
+            this.searchBtn.innerHTML = `
+                <span class="btn-icon">🔍</span>
+                <span class="btn-text">Search</span>
+            `;
+        }
+    }
+    
+    displaySearchResults(results) {
+        if (!results || results.length === 0) {
+            this.showNoResults();
+            return;
+        }
+        
+        this.searchResults.innerHTML = results.map((result, index) => `
+            <div class="search-result-item">
+                <div class="result-header">
+                    <div>
+                        <div class="result-title">${this.escapeHtml(result.title)}</div>
+                        <div class="result-info">
+                            ${result.quality ? `<span class="result-badge quality">${result.quality}</span>` : ''}
+                            ${result.size ? `<span class="result-badge size">${result.size}</span>` : ''}
+                            ${result.seeders ? `<span class="result-badge seeders">${result.seeders} seeders</span>` : ''}
+                            ${result.category ? `<span class="result-badge">${result.category}</span>` : ''}
+                        </div>
+                    </div>
+                </div>
+                <div class="result-actions">
+                    <button class="download-torrent-btn" data-index="${index}">
+                        <span>📥</span>
+                        Download
+                    </button>
+                </div>
+            </div>
+        `).join('');
+        
+        // Add click handlers after HTML is inserted
+        this.searchResults.querySelectorAll('.download-torrent-btn').forEach((btn, index) => {
+            btn.addEventListener('click', () => {
+                const result = results[index];
+                this.downloadTorrent(result.magnetLink || result.downloadLink, result.title);
+            });
+        });
+    }
+    
+    showNoResults() {
+        this.searchResults.innerHTML = `
+            <div class="no-results">
+                <div>No results found</div>
+                <div style="font-size: 14px; margin-top: 10px;">Try different keywords or check your search settings</div>
+            </div>
+        `;
+    }
+    
+    clearSearchResults() {
+        this.searchResults.innerHTML = '';
+    }
+    
+    async downloadTorrent(magnetLink, title) {
+        if (!magnetLink) {
+            this.showStatus('No download link available', 'error');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/torrent/download', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    magnetLink, 
+                    title: title 
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                this.showStatus(`✅ Started downloading: ${title}`, 'success');
+                
+                // Haptic feedback on mobile
+                if (navigator.vibrate) {
+                    navigator.vibrate(50);
+                }
+            } else {
+                this.showStatus('Download failed: ' + result.error, 'error');
+            }
+        } catch (error) {
+            console.error('Torrent download error:', error);
+            this.showStatus('Download failed: Unable to connect to server', 'error');
         }
     }
 

@@ -2,7 +2,9 @@ const express = require('express');
 const path = require('path');
 const config = require('../config/config');
 const DownloadService = require('./services/downloadService');
-const JellyfinService = require('./services/jellyfinService');  
+const JellyfinService = require('./services/jellyfinService');
+const SearchService = require('./services/searchService'); 
+const TorrentService = require('./services/torrentService');
 const createDownloadRoutes = require('./routes/downloadRoutes');
 const FileUtils = require('./utils/fileUtils');
 
@@ -13,7 +15,9 @@ class JellyfinDownloaderServer {
       config.downloadFolder, 
       config.maxConcurrentDownloads
     );
-    this.jellyfinService = new JellyfinService(config);  
+    this.jellyfinService = new JellyfinService(config);
+    this.searchService = new SearchService(config);
+    this.torrentService = new TorrentService(config);
     
     this.setupMiddleware();
     this.setupRoutes();
@@ -27,7 +31,7 @@ class JellyfinDownloaderServer {
     
     // Request logging middleware
     this.app.use((req, res, next) => {
-      if (req.path !== '/downloads') { // Don't log polling requests
+      if (req.path !== '/downloads' && req.path !== '/torrents') { // Don't log polling requests
         console.log(`🌐 [${FileUtils.getCurrentTimestamp()}] ${req.method} ${req.path} - ${req.ip || req.connection.remoteAddress}`);
       }
       next();
@@ -40,9 +44,19 @@ class JellyfinDownloaderServer {
       res.sendFile(path.join(__dirname, '../public/index.html'));
     });
     
-    // API routes
-    this.app.use('/api', createDownloadRoutes(this.downloadService, this.jellyfinService));
-    this.app.use('/', createDownloadRoutes(this.downloadService, this.jellyfinService));
+    this.app.use('/api', createDownloadRoutes(
+      this.downloadService, 
+      this.jellyfinService, 
+      this.searchService, 
+      this.torrentService
+    ));
+    
+    this.app.use('/', createDownloadRoutes(
+      this.downloadService, 
+      this.jellyfinService, 
+      this.searchService, 
+      this.torrentService
+    ));
   }
    
   setupErrorHandling() {
@@ -69,11 +83,22 @@ class JellyfinDownloaderServer {
       console.log(`💻 Local Access: http://localhost:${config.port}`);
       console.log(`📁 Download Folder: ${config.downloadFolder}`);
       console.log(`⚡ Max Concurrent Downloads: ${config.maxConcurrentDownloads}`);
+      console.log(`🔗 Jellyfin Integration: ${this.jellyfinService.isEnabled() ? '✅ Enabled' : '❌ Disabled'}`);
+      console.log(`🔍 Search Integration: ${this.searchService.isEnabled() ? '✅ Enabled' : '❌ Disabled'}`);
+      console.log(`🧲 Torrent Integration: ${this.torrentService.isEnabled() ? '✅ Enabled' : '❌ Disabled'}`);
       console.log('=' .repeat(60));
       console.log(`🕐 Server started at: ${FileUtils.getCurrentTimestamp()}`);
       console.log('');
-      console.log('⚠️  IMPORTANT: Make sure to update the download folder path in config/config.js');
+      console.log('⚠️  IMPORTANT: Update paths in config/config.js and add secrets.json');
       console.log('📲 Bookmark the phone access URL on your mobile device');
+      
+      if (!this.searchService.isEnabled()) {
+        console.log('🔍 To enable search: Install Jackett and add API details to secrets.json');
+      }
+      if (!this.torrentService.isEnabled()) {
+        console.log('🧲 To enable torrents: Install qBittorrent and add credentials to secrets.json');
+      }
+      
       console.log('');
       console.log('📊 Server Logs:');
       console.log('─'.repeat(40));
