@@ -84,7 +84,6 @@ class TorrentService {
       // Extract session cookie from response
       if (response.cookie) {
         this.cookie = response.cookie;
-        console.log(`🔐 [${FileUtils.getCurrentTimestamp()}] Authenticated with qBittorrent`);
       } else {
         throw new Error('Authentication failed - no session cookie received');
       }

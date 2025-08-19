@@ -216,9 +216,48 @@ class JellyfinDownloaderApp {
         
         // Add click handlers after HTML is inserted
         this.searchResults.querySelectorAll('.download-torrent-btn').forEach((btn, index) => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', async () => {
                 const result = results[index];
-                this.downloadTorrent(result.magnetLink || result.downloadLink, result.title);
+                
+                // Show immediate feedback
+                btn.disabled = true;
+                btn.innerHTML = `
+                    <div class="progress-spinner"></div>
+                    <span>Starting...</span>
+                `;
+                
+                try {
+                    const success = await this.downloadTorrent(result.magnetLink || result.downloadLink, result.title);
+                    
+                    if (success) {
+                        // Clear ALL search results after successful download
+                        this.searchResults.innerHTML = `
+                            <div class="download-success">
+                                <div class="success-icon">✅</div>
+                                <div class="success-title">Download Started!</div>
+                                <div class="success-subtitle">Check downloads below for progress</div>
+                                <button class="new-search-btn" onclick="window.jellyfinApp.clearSearchAndFocus()">
+                                    <span>🔍</span>
+                                    Search for something else
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        // Reset button on failure
+                        btn.disabled = false;
+                        btn.innerHTML = `
+                            <span>📥</span>
+                            Download
+                        `;
+                    }
+                } catch (error) {
+                    // Reset button on error
+                    btn.disabled = false;
+                    btn.innerHTML = `
+                        <span>📥</span>
+                        Download
+                    `;
+                }
             });
         });
     }
@@ -236,10 +275,24 @@ class JellyfinDownloaderApp {
         this.searchResults.innerHTML = '';
     }
     
+    clearSearchAndFocus() {
+        // Clear search results
+        this.clearSearchResults();
+        
+        // Clear search input
+        this.searchQueryInput.value = '';
+        
+        // Focus on search input for next query
+        this.searchQueryInput.focus();
+        
+        // Clear any status messages
+        this.clearStatus();
+    }
+    
     async downloadTorrent(magnetLink, title) {
         if (!magnetLink) {
             this.showStatus('No download link available', 'error');
-            return;
+            return false;
         }
         
         try {
@@ -259,16 +312,23 @@ class JellyfinDownloaderApp {
             if (response.ok) {
                 this.showStatus(`✅ Started downloading: ${title}`, 'success');
                 
+                // Update downloads immediately to show new torrent
+                this.updateDownloads();
+                
                 // Haptic feedback on mobile
                 if (navigator.vibrate) {
                     navigator.vibrate(50);
                 }
+                
+                return true;
             } else {
                 this.showStatus('Download failed: ' + result.error, 'error');
+                return false;
             }
         } catch (error) {
             console.error('Torrent download error:', error);
             this.showStatus('Download failed: Unable to connect to server', 'error');
+            return false;
         }
     }
 
@@ -386,14 +446,27 @@ class JellyfinDownloaderApp {
     
     async updateDownloads() {
         try {
-            const response = await fetch('/downloads');
+            // Get both direct downloads and torrents
+            const [downloadsResponse, torrentsResponse] = await Promise.all([
+                fetch('/downloads'),
+                fetch('/torrents')
+            ]);
             
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
+            const downloads = downloadsResponse.ok ? await downloadsResponse.json() : [];
+            const torrents = torrentsResponse.ok ? await torrentsResponse.json() : [];
             
-            const downloads = await response.json();
-            this.renderDownloads(downloads);
+            // Combine both types of downloads
+            const allDownloads = [
+                ...downloads.map(d => ({...d, type: 'direct'})),
+                ...torrents.map(t => ({
+                    filename: t.name,
+                    status: `${t.state} - ${t.progress}% (${t.downloadSpeed})`,
+                    progress: t.progress,
+                    type: 'torrent'
+                }))
+            ];
+            
+            this.renderDownloads(allDownloads);
             
         } catch (error) {
             console.error('Failed to update downloads:', error);
@@ -413,12 +486,16 @@ class JellyfinDownloaderApp {
     }
     
     renderDownloadItem(download) {
-        const isActive = !download.status.includes('Failed');
-        const spinner = isActive ? '<div class="progress-spinner"></div>' : '';
+        const isActive = !download.status.includes('Failed') && !download.status.includes('completed');
+        const isCompleted = download.status.includes('completed') || download.progress === 100;
+        const spinner = isActive && !isCompleted ? '<div class="progress-spinner"></div>' : '';
+        const icon = isCompleted ? '✅' : (download.type === 'torrent' ? '🧲' : '📥');
         
         return `
-            <div class="download-item">
-                <div class="download-name">${this.escapeHtml(download.filename)}</div>
+            <div class="download-item ${download.type}">
+                <div class="download-name">
+                    ${icon} ${this.escapeHtml(download.filename)}
+                </div>
                 <div class="download-progress">
                     ${spinner}
                     ${this.escapeHtml(download.status)}
