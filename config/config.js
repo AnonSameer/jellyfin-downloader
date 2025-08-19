@@ -22,7 +22,7 @@ const config = {
   
   // Download settings
   downloadFolder: 'C:/Users/samee/source/Content', 
-  maxConcurrentDownloads: 3,
+  maxConcurrentDownloads: 5,
   
   // Jellyfin integration settings
   jellyfin: {
@@ -31,6 +31,23 @@ const config = {
     apiKey: secrets.jellyfinApiKey || null,
     // Optional: Specific library IDs to refresh (leave empty to refresh all)
     libraryIds: secrets.jellyfinLibraryIds || []
+  },
+
+  // Search integration settings (Jackett)
+  search: {
+    enabled: !!(secrets.jackettUrl && secrets.jackettApiKey),
+    jackettUrl: secrets.jackettUrl || 'http://localhost:9117',
+    jackettApiKey: secrets.jackettApiKey || null,
+    indexers: secrets.jackettIndexers || ['all']
+  },
+
+  // Torrent client settings (qBittorrent)
+  torrent: {
+    enabled: !!(secrets.qbittorrentUrl && secrets.qbittorrentUsername && secrets.qbittorrentPassword),
+    qbittorrentUrl: secrets.qbittorrentUrl || 'http://localhost:8080',
+    username: secrets.qbittorrentUsername || null,
+    password: secrets.qbittorrentPassword || null,
+    downloadPath: secrets.torrentDownloadPath || 'C:/Users/samee/source/Media'
   },
   
   // UI settings
